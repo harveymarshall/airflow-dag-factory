@@ -1,0 +1,60 @@
+{# Note this file indentation - this is expected to fit a specific level in the base template #}
+operator: GKEStartPodOperator
+    {% include 'airflow-operators/_base.j2' with context %}
+    operator_kwargs:
+      name: "airflow_pod"
+      project_id: "{{ task_args.project_id or "petsathome-analytics-{{ env }}" }}"
+      location: "{{ task_args.location or "europe-west2" }}"
+      cluster_name: "{{ task_args.cluster_name or "default" }}"
+      namespace: "{{ task_args.namespace or "default" }}"
+      service_account_name: "{{ task_args.service_account_name or "default" }}"
+      image: "{{ task_args.image }}"
+      {% if task_args.cmds is defined %}
+      cmds:
+        {% for command in task_args.cmds %}
+        - "{{ command }}"
+        {% endfor %}
+      {% endif %}
+      {% if task_args.arguments is defined %}
+      arguments:
+        {% for argument in task_args.arguments %}
+        - {{ argument }}
+        {% endfor %}
+      {% endif %}
+      {% if task_args.env_vars is defined %}
+      env_vars:
+        {% for key, value in task_args.env_vars.items() %}
+        {% if value.__class__.__name__ == 'list' %}
+        {{ key }}: {{ value|join(",") }}
+        {% elif value is string and value.startswith("!_|") %}
+        {{ key }}: |
+{{ value[3:] | indent(10, true) }}
+        {% elif value is none %}
+        {{ key }}: null
+        {% else %}
+        {{ key }}: "{{ value }}"
+        {% endif %}
+        {% endfor %}
+      {% endif %}
+      {% if task_args.labels is defined %}
+      labels:
+        {% for key, value in task_args.labels.items() %}
+        {{ key }}: "{{ value|replace(' ', '-') }}"
+        {% endfor %}
+      {% endif %}
+      image_pull_policy: "{{ task_args.image_pull_policy or  "Always" }}"
+      do_xcom_push: {{ task_args.do_xcom_push or False }}
+      get_logs: True
+      log_events_on_failure: True
+      random_name_suffix: True
+      is_delete_operator_pod: True
+      {% if task_args.container_resources is defined %}
+      container_resources:
+        {% for key, value in task_args.container_resources.items() %}
+        {{ key }}: {{ value }}
+        {% endfor %}
+      {% endif %}
+      {% if task_args.retries is defined %}
+      retries: {{ task_args.retries }}
+      {% endif %}
+{# Note this extra line return - this is expected to fit a specific level in the base template #}

@@ -1,0 +1,12 @@
+{% import "macros.j2" as m -%}
+{#- Initialise blank env vars -#}
+{% if task_args.env_vars is not defined %}
+{% do task_args.update({"env_vars": {}}) %}
+{% endif %}
+{#- Set required env vars -#}
+{% for key, value in task_args.settings.items() %}
+{% do task_args.env_vars.update({key: value}) %}
+{% endfor %}
+{% set defaults = {}
+-%}
+{{ m.render_with_defaults("airflow-operators/GKEStartPod.j2", defaults, task_args)}}

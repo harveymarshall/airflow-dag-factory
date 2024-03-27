@@ -1,0 +1,83 @@
+dag_id: {{ dag_id }}
+default_args:
+  owner: {{ owner }}
+  retries: {{ retries or 3 }}
+  retry_delay_sec: {{ retry_delay_sec or 300 }}
+catchup: {{ catchup or False }}
+{% if start_date is defined %}
+start_date: "{{ start_date }}"
+{% endif %}
+{% if params is defined %}
+params:
+  {% for param in params %}
+  - id: {{ param.id }}
+    description: {{ param.description }}
+    type: {{ param.type }}
+    {% if param.required is defined %}
+    required: {{ param.required }}
+    {% endif %}
+    {% if param.default_value is defined %}
+    default_value: {{ param.default_value }}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+{% if allowed_envs is defined %}
+allowed_envs:
+  {% for env in allowed_envs %}
+  - {{ env }}
+  {% endfor %}
+{% endif %}
+tags:
+  - dag factory
+  {% if tags is defined %}
+  {% for tag in tags %}
+  - {{ tag }}
+  {% endfor %}
+  {% endif %}
+  {% if _workflow is defined %}
+  - "workflow:{{ _workflow._name }}"
+  {% endif %}
+timezone: "{{ timezone or "Europe/London" }}"
+concurrency: {{ concurrency or 5 }}
+max_active_runs: {{ max_active_runs or 1 }}
+dagrun_timeout_sec: {{ dagrun_timeout_sec or 60 }}
+default_view: "{{ default_view or 'tree' }}"
+orientation: "{{ orientation or 'LR' }}"
+{% if schedule is not defined or schedule == None %}
+schedule: null
+{% elif schedule.__class__.__name__ == 'dict' %}
+schedule: {{ schedule }}
+{% else %}
+schedule: "{{ schedule }}"
+{% endif %}
+{% if documentation is defined  %}
+documentation: |
+{{ documentation | indent(2, true) }}
+{% endif %}
+{% if _workflow is defined %}
+{% set workflow_template = 'workflows/' + _workflow._name + "/" + _workflow._version + '.j2' %}
+{% include workflow_template with context %}
+{% else %}
+{% if task_groups is defined %}
+task_groups:
+{% for task_group in task_groups %}
+  - id: {{ task_group.id }}
+  {% if task_group.dependencies is defined %}
+    dependencies:
+    {% for dependency in task_group.dependencies %}
+      - id: {{ dependency.id }}
+        {% if dependency.label is defined %}
+        label: {{ dependency.label }}
+        {% endif %}
+    {% endfor %}
+  {% endif %}
+{% endfor %}
+{% endif %}
+description: "{{ description }}"
+tasks:
+  {% for task_args in tasks %}
+    {% if task_args.type is defined %}
+  - {% include 'tasks/' + task_args.type + '.j2' with context %}
+    {% endif %}
+  {% endfor %}
+{% endif %}

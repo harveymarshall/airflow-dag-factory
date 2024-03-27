@@ -1,0 +1,20 @@
+{#
+To use these macros in another file, first import it:
+
+    {% import "macros.j2" as m -%}
+
+then you can call the macros using the import prefix, e.g:
+
+    {{ m.render_with_defaults("airflow-operators/GKEStartPod.j2", defaults, task_args)}}
+#}
+
+{% macro render_with_defaults(operator, defaults, task_args) -%}
+{% for key, value in defaults.items() %}
+{% do task_args.update({key: value}) %}
+{% endfor %}
+{% include operator with context %}
+{% endmacro -%}
+
+{% macro default_secret_project() %}petsathome-secrets{% endmacro %}
+
+{% macro default_project() %}"{{ "petsathome-analytics-{{ env }}" }}"{% endmacro %}

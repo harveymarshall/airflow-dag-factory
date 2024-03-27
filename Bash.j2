@@ -1,0 +1,5 @@
+{# Note this file indentation - this is expected to fit a specific level in the base template #}
+    operator: BashOperator
+    {% include 'airflow-operators/_base.j2' with context %}
+    operator_kwargs:
+      bash_command: "{{ task_args.bash_command }}"

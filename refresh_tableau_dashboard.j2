@@ -1,0 +1,21 @@
+{% import "macros.j2" as m -%}
+{#- Initialise blank env vars -#}
+{% if task_args.env_vars is not defined %}
+{% do task_args.update({"env_vars": {}}) %}
+{% endif %}
+{#- Set required env vars -#}
+{% do task_args.env_vars.update(
+    {
+      "API_COMMAND": "refresh",
+      "SECRET_ID": "{{ env }}_tableau_api_user",
+      "SECRET_PROJECT_ID": m.default_secret_project(),
+      "ENVIRONMENT": "{{ env }}",
+      "WORKBOOK_ID": "{%- if env == 'local' -%} " + task_args.settings.workbook_id.dev + " {%- elif env == 'dev' -%} " + task_args.settings.workbook_id.dev + " {%- elif env == 'test' -%} " + task_args.settings.workbook_id.dev + " {%- elif env == 'prd' -%} " + task_args.settings.workbook_id.production + " {%- else -%} invalid_environment {%- endif -%}"
+    }
+) %}
+{% set defaults = {
+    "image": "europe-west2-docker.pkg.dev/petsathome-container-store/data-migration/tableau-api:{{ image_tag }}",
+    }
+-%}
+
+{{ m.render_with_defaults("airflow-operators/GKEStartPod.j2", defaults, task_args)}}

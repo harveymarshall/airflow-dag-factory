@@ -1,0 +1,34 @@
+{# Note this file indentation - this is expected to fit a specific level in the base template #}
+    {% if task_args.id is defined %}
+    id: {{ task_args.id }}
+    {% endif %}
+    {% if task_args.params is defined %}
+    params: {{ task_args.params}}
+    {% endif %}
+    {% if task_args.dependencies is defined %}
+    dependencies:
+    {% for dependency in task_args.dependencies %}
+      - id: {{ dependency.id }}
+        {% if dependency.label is defined %}
+        label: "{{ dependency.label or "" }}"
+        {% endif %}
+    {% endfor %}
+    {% endif %}
+    {% if task_args.group is defined %}
+    group: {{ task_args.group }}
+    {% endif %}
+    {% if task_args.outlets is defined %}
+    outlets:
+    {% for value in task_args.outlets %}
+      - {{ value }}
+    {% endfor %}
+    {% endif %}
+    {% if task_args.trigger_rule is defined %}
+    trigger_rule: {{ task_args.trigger_rule }}
+    {% endif %}
+    {% if task_args.execution_timeout is defined %}
+    execution_timeout:
+      {% for k, v in task_args.execution_timeout.items() %}
+      {{ k }}: {{ v }}
+      {% endfor %}
+    {% endif %}

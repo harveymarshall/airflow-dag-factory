@@ -1,0 +1,101 @@
+{% import "macros.j2" as m -%}
+{#- Define a macro to assemble dbt command arguments as a list: -#}
+{% macro assemble_dbt_arguments(dbt_args) -%}
+{#- starting with the global flags: -#}
+{% set arguments = [
+        "--no-write-json",
+        "--no-use-colors",
+    ]
+%}
+{% if dbt_args.command != 'test' %}
+{% do arguments.append('--warn-error-options')%}
+{% do arguments.append("{'include': [NoNodesForSelectionCriteria]}")%}
+{% endif %}
+{#- then add the dbt command(s): -#}
+{% for arg in dbt_args.command.split(" ") %}
+{% do arguments.append(arg)%}
+{% endfor%}
+{#- target our current environment based on billing model: -#}
+{% do arguments.append("--target") %}
+{% if dbt_args.billing_model is defined %}
+{% do arguments.append("{{ env }}_"+dbt_args.billing_model) %}
+{% else %}
+{#- Default to slots billing model: -#}
+{% do arguments.append("{{ env }}_slots") %}
+{% endif %}
+{#- set project directory and profile: -#}
+{% do arguments.append("--project-dir") %}
+{% do arguments.append("dbt_projects/"+dbt_args.project_dir) %}
+{% do arguments.append("--profiles-dir") %}
+{% do arguments.append("dbt_projects/"+ dbt_args.project_dir +"/ci") %}
+{#- dbt select: -#}
+{% if dbt_args.select is defined %}
+{% do arguments.append("--select")%}
+{% do arguments.append(dbt_args.select)%}
+{% endif %}
+{#- dbt selector: -#}
+{% if dbt_args.selector is defined %}
+{% do arguments.append("--selector")%}
+{% do arguments.append(dbt_args.selector)%}
+{% endif %}
+{#- dbt macro name: -#}
+{% if dbt_args.macro_name is defined %}
+{% do arguments.append(dbt_args.macro_name)%}
+{% endif %}
+{#- dbt macro args: -#}
+{% if dbt_args.macro_args is defined %}
+{% do arguments.append("--args")%}
+{% do arguments.append(dbt_args.macro_args | string)%}
+{% endif %}
+{#- Now list everything out, so it gets included in the operator: -#}
+{% for arg in arguments %}"{{ arg }}"{% if not loop.last %},{% endif %}{% endfor -%}
+{%- endmacro -%}
+{#- add some GKE labels: -#}
+{% if task_args.labels is not defined %}{% do task_args.update({"labels": {}}) %}{% endif %}
+{% do task_args.labels.update(
+    {
+        "dbt-command": task_args.settings.command,
+        "dbt-project": task_args.settings.project_dir,
+    }
+) %}
+{#- set environment variables: -#}
+{% if task_args.env_vars is not defined %}{% do task_args.update({"env_vars": {}}) %}{% endif %}
+{% do task_args.env_vars.update(
+    {
+      "EXECUTION_DATE": "'{{ macros.ds_format(format_input_date(params.manual_interval_start_date), '%Y-%m-%dT%H:%M:%S+00:00', '%Y-%m-%d') if params.manual_interval_start_date else macros.ds_format(format_input_date(data_interval_start), '%Y-%m-%dT%H:%M:%S+00:00', '%Y-%m-%d') }}'",
+      "AIRFLOW_TS": "'{{ macros.ds_format(format_input_date(params.manual_interval_start_date), '%Y-%m-%dT%H:%M:%S+00:00', '%Y-%m-%dT%H:%M:%S+00:00') if params.manual_interval_start_date else macros.ds_format(format_input_date(data_interval_start), '%Y-%m-%dT%H:%M:%S+00:00', '%Y-%m-%dT%H:%M:%S+00:00') }}'",
+      "AIRFLOW_DS": "'{{ macros.ds_format(format_input_date(params.manual_interval_start_date), '%Y-%m-%dT%H:%M:%S+00:00', '%Y-%m-%d') if params.manual_interval_start_date else macros.ds_format(format_input_date(data_interval_start), '%Y-%m-%dT%H:%M:%S+00:00', '%Y-%m-%d') }}'",
+      "AIRFLOW_DATA_INTERVAL_END": "'{{ macros.ds_format(format_input_date(params.manual_interval_end_date), '%Y-%m-%dT%H:%M:%S+00:00', '%Y-%m-%dT%H:%M:%S+00:00') if params.manual_interval_end_date else macros.ds_format(format_input_date(data_interval_end), '%Y-%m-%dT%H:%M:%S+00:00', '%Y-%m-%dT%H:%M:%S+00:00') }}'",
+    }
+) %}
+{#- set full refresh via environment variables to avoid breaking the CLI: -#}
+{% if task_args.settings.full_refresh is defined %}
+{% if task_args.settings.full_refresh is boolean %}
+{% if task_args.settings.full_refresh == true %}
+{% do task_args.env_vars.update(
+    {
+      "DBT_FULL_REFRESH": "true",
+    }
+) %}
+{% endif %}
+{% else %}
+{% do task_args.env_vars.update(
+    {
+      "\"{% if " + task_args.settings.full_refresh.strip("{} ") + " %}DBT_FULL_REFRESH{% else %}DBT_NO_FULL_REFRESH{% endif %}\"": "true",
+    }
+) %}
+{% endif %}
+{% endif %}
+{#- assemble our defaults and dbt arguments: -#}
+{% set defaults = {
+    "image": "europe-west2-docker.pkg.dev/petsathome-container-store/dbt/webserver:{{ env }}",
+    "arguments": assemble_dbt_arguments(task_args.settings).replace("\",\"", "\";\"").split(";"),
+    "service_account_name": task_args.service_account_name or "dbt",
+    "namespace": task_args.namespace or "dbt",
+    }
+-%}
+{% if task_args.settings.command == 'test' %}
+{% do defaults.update({'retries': '0'}) %}
+{% endif %}
+{#- and finally, render the whole lot: -#}
+{{ m.render_with_defaults("airflow-operators/GKEStartPod.j2", defaults, task_args)}}
