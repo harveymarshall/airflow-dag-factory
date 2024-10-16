@@ -7,6 +7,7 @@ import yaml
 from airflow import DAG, Dataset
 from airflow.models.param import Param
 from airflow.operators.bash_operator import BashOperator
+from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
 from airflow.providers.google.cloud.operators.kubernetes_engine import (
     GKEStartPodOperator,
 )
@@ -22,6 +23,7 @@ from modules.utils.jinja_utils import USER_DEFINED_FILTERS, USER_DEFINED_MACROS
 SUPPORTED_OPERATOR_TYPES = {
     "BashOperator": BashOperator,
     "GKEStartPodOperator": GKEStartPodOperator,
+    "KubernetesPodOperator": KubernetesPodOperator,
 }
 """These are the operator types we can currently build.
 
